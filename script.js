@@ -9,13 +9,13 @@ import {
 // =========================================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBA9MG04RH4wVIC11zIYQEpVaTCNM7zDQ",
+  apiKey: "AIzaSyBA9MG04RH4wVICI1lzIYQepVaTCNM7zDQ",
   authDomain: "simon-memory-game-6a98f.firebaseapp.com",
   projectId: "simon-memory-game-6a98f",
   storageBucket: "simon-memory-game-6a98f.firebasestorage.app",
   messagingSenderId: "549627763133",
   appId: "1:549627763133:web:edb9818d7d8be8d0465ad4",
-  measurementId: "G-YCY2L8JZBD"
+  measurementId: "G-YCY2L8JZBD",
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -55,12 +55,12 @@ loginBtn.addEventListener("click", async () => {
     const response = await fetch("/api/login", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         username,
-        password
-      })
+        password,
+      }),
     });
 
     const data = await response.json();
@@ -75,11 +75,9 @@ loginBtn.addEventListener("click", async () => {
 
     authPanel.style.display = "none";
     message.innerText = `Welcome, ${currentUsername}!`;
-
   } catch (error) {
     console.error("Login error:", error);
     showAuthMessage(error.message || "LOGIN FAILED");
-
   } finally {
     loginBtn.disabled = false;
     registerBtn.disabled = false;
@@ -104,12 +102,12 @@ registerBtn.addEventListener("click", async () => {
     const response = await fetch("/api/register", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         username,
-        password
-      })
+        password,
+      }),
     });
 
     const data = await response.json();
@@ -124,11 +122,9 @@ registerBtn.addEventListener("click", async () => {
 
     authPanel.style.display = "none";
     message.innerText = `Welcome, ${currentUsername}!`;
-
   } catch (error) {
     console.error("Registration error:", error);
     showAuthMessage(error.message || "ACCOUNT CREATION FAILED");
-
   } finally {
     registerBtn.disabled = false;
     loginBtn.disabled = false;

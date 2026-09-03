@@ -1,3 +1,149 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+import {
+  getAuth,
+  signInWithCustomToken,
+  onAuthStateChanged,
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+// =========================================================
+// FIREBASE CONFIGURATION
+// =========================================================
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBA9MG04RH4wVIC11zIYQEpVaTCNM7zDQ",
+  authDomain: "simon-memory-game-6a98f.firebaseapp.com",
+  projectId: "simon-memory-game-6a98f",
+  storageBucket: "simon-memory-game-6a98f.firebasestorage.app",
+  messagingSenderId: "549627763133",
+  appId: "1:549627763133:web:edb9818d7d8be8d0465ad4",
+  measurementId: "G-YCY2L8JZBD"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+// =========================================================
+// AUTHENTICATION
+// =========================================================
+
+const authPanel = document.querySelector("#authPanel");
+const authUsername = document.querySelector("#authUsername");
+const authPassword = document.querySelector("#authPassword");
+const loginBtn = document.querySelector("#loginBtn");
+const registerBtn = document.querySelector("#registerBtn");
+const authMessage = document.querySelector("#authMessage");
+
+let currentUsername = null;
+
+function showAuthMessage(text) {
+  authMessage.innerText = text;
+}
+
+// LOGIN
+loginBtn.addEventListener("click", async () => {
+  const username = authUsername.value.trim();
+  const password = authPassword.value;
+
+  if (!username || !password) {
+    showAuthMessage("ENTER USERNAME AND PASSWORD");
+    return;
+  }
+
+  loginBtn.disabled = true;
+  registerBtn.disabled = true;
+  showAuthMessage("AUTHENTICATING…");
+
+  try {
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        username,
+        password
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Login failed");
+    }
+
+    await signInWithCustomToken(auth, data.token);
+
+    currentUsername = data.username;
+
+    authPanel.style.display = "none";
+    message.innerText = `Welcome, ${currentUsername}!`;
+
+  } catch (error) {
+    console.error("Login error:", error);
+    showAuthMessage(error.message || "LOGIN FAILED");
+
+  } finally {
+    loginBtn.disabled = false;
+    registerBtn.disabled = false;
+  }
+});
+
+// CREATE ACCOUNT
+registerBtn.addEventListener("click", async () => {
+  const username = authUsername.value.trim();
+  const password = authPassword.value;
+
+  if (!username || !password) {
+    showAuthMessage("ENTER USERNAME AND PASSWORD");
+    return;
+  }
+
+  registerBtn.disabled = true;
+  loginBtn.disabled = true;
+  showAuthMessage("CREATING ACCOUNT…");
+
+  try {
+    const response = await fetch("/api/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        username,
+        password
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Registration failed");
+    }
+
+    await signInWithCustomToken(auth, data.token);
+
+    currentUsername = data.username;
+
+    authPanel.style.display = "none";
+    message.innerText = `Welcome, ${currentUsername}!`;
+
+  } catch (error) {
+    console.error("Registration error:", error);
+    showAuthMessage(error.message || "ACCOUNT CREATION FAILED");
+
+  } finally {
+    registerBtn.disabled = false;
+    loginBtn.disabled = false;
+  }
+});
+
+// CHECK LOGIN STATE
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    currentUsername = user.displayName || currentUsername;
+    authPanel.style.display = "none";
+  } else {
+    authPanel.style.display = "flex";
+  }
+});
 /* =========================================================
    LEADERBOARD SERVICE (DATABASE READY)
 ========================================================= */
@@ -38,7 +184,7 @@ class LeaderboardService {
         id: "score_" + Date.now(),
         name: name.trim().slice(0, 12).toUpperCase() || "OPERATOR",
         score: parseInt(score, 10),
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       /* FUTURE BACKEND API SWAP:
@@ -154,7 +300,10 @@ function playSound(freq, duration = 0.22) {
   osc.type = "sine";
 
   gain.gain.setValueAtTime(0.18, audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+  gain.gain.exponentialRampToValueAtTime(
+    0.001,
+    audioContext.currentTime + duration,
+  );
 
   osc.connect(gain);
   gain.connect(audioContext.destination);
@@ -176,7 +325,7 @@ function spawnParticles(x, y, color) {
     red: "#ff3b3b",
     green: "#00f5a0",
     yellow: "#facc15",
-    blue: "#38bdf8"
+    blue: "#38bdf8",
   };
   const c = colors[color] || "#38bdf8";
 
@@ -285,7 +434,8 @@ function checkAnswer(idx) {
 
   if (userSeq.length === gameSeq.length) {
     message.className = "message success";
-    message.innerText = level % 5 === 0 ? `Round ${level}! Phenomenal!` : "Verified! Next…";
+    message.innerText =
+      level % 5 === 0 ? `Round ${level}! Phenomenal!` : "Verified! Next…";
 
     if (level > highScore) {
       highScore = level;
@@ -298,7 +448,7 @@ function checkAnswer(idx) {
     spawnParticles(
       rect.left + rect.width / 2,
       rect.top + rect.height / 2,
-      userSeq[userSeq.length - 1]
+      userSeq[userSeq.length - 1],
     );
 
     setTimeout(levelUp, 850);
@@ -322,7 +472,7 @@ document.querySelectorAll(".btn").forEach((btn) => {
       e.preventDefault();
       btnPress(e);
     },
-    { passive: false }
+    { passive: false },
   );
 });
 
@@ -345,7 +495,8 @@ async function gameOver() {
   startBtn.disabled = false;
   startBtn.querySelector("span").innerText = "PLAY AGAIN";
 
-  document.body.style.background = "radial-gradient(circle at 50% 45%, #450a0a, #06080f 70%)";
+  document.body.style.background =
+    "radial-gradient(circle at 50% 45%, #450a0a, #06080f 70%)";
 
   setTimeout(() => {
     board.classList.remove("game-over");

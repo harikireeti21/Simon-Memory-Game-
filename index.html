@@ -16,6 +16,33 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <!-- AUTH PANEL -->
+    <div class="auth-panel" id="authPanel">
+      <div class="auth-box">
+        <h2>PLAYER ACCESS</h2>
+        <p id="authMessage">LOGIN OR CREATE ACCOUNT</p>
+
+        <input
+          type="text"
+          id="authUsername"
+          maxlength="12"
+          placeholder="USERNAME"
+          autocomplete="username"
+        />
+
+        <input
+          type="password"
+          id="authPassword"
+          placeholder="PASSWORD"
+          autocomplete="current-password"
+        />
+
+        <button id="loginBtn" class="auth-btn">LOGIN</button>
+        <button id="registerBtn" class="auth-btn secondary">
+          CREATE ACCOUNT
+        </button>
+      </div>
+    </div>
     <div class="glow-bg"></div>
     <div class="particles" id="particles"></div>
 
@@ -37,7 +64,9 @@
           </div>
           <div class="hud-card highlight">
             <span class="hud-label">YOUR RECORD</span>
-            <strong id="highScore" class="hud-value" style="color: #38bdf8;">0</strong>
+            <strong id="highScore" class="hud-value" style="color: #38bdf8"
+              >0</strong
+            >
           </div>
         </section>
 

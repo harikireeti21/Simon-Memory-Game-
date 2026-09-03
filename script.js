@@ -22,6 +22,7 @@ const firebaseConfig = {
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
+
 const auth = getAuth(firebaseApp);
 
 // =========================================================
@@ -29,16 +30,25 @@ const auth = getAuth(firebaseApp);
 // =========================================================
 
 const authPanel = document.querySelector("#authPanel");
+
 const authUsername = document.querySelector("#authUsername");
+
 const authPassword = document.querySelector("#authPassword");
 
 const loginBtn = document.querySelector("#loginBtn");
+
 const registerBtn = document.querySelector("#registerBtn");
+
 const authMessage = document.querySelector("#authMessage");
 
+// =========================================================
 // USER PANEL
+// =========================================================
+
 const userPanel = document.querySelector("#userPanel");
+
 const userNameDisplay = document.querySelector("#userNameDisplay");
+
 const signOutBtn = document.querySelector("#signOutBtn");
 
 let currentUsername = null;
@@ -57,10 +67,12 @@ function showAuthMessage(text) {
 
 loginBtn.addEventListener("click", async () => {
   const username = authUsername.value.trim();
+
   const password = authPassword.value;
 
   if (!username || !password) {
     showAuthMessage("ENTER USERNAME AND PASSWORD");
+
     return;
   }
 
@@ -89,20 +101,18 @@ loginBtn.addEventListener("click", async () => {
       throw new Error(data.error || "Login failed");
     }
 
-    // Sign into Firebase
     await signInWithCustomToken(auth, data.token);
 
     currentUsername = data.username;
 
     authPanel.style.display = "none";
 
-    // Show username
-    userNameDisplay.innerText = currentUsername || "PLAYER";
+    userNameDisplay.innerText = currentUsername;
+
     userPanel.style.display = "flex";
 
     message.innerText = `Welcome, ${currentUsername}!`;
 
-    // Refresh leaderboard
     await renderLeaderboard();
   } catch (error) {
     console.error("Login error:", error);
@@ -110,6 +120,7 @@ loginBtn.addEventListener("click", async () => {
     showAuthMessage(error.message || "LOGIN FAILED");
   } finally {
     loginBtn.disabled = false;
+
     registerBtn.disabled = false;
   }
 });
@@ -120,14 +131,17 @@ loginBtn.addEventListener("click", async () => {
 
 registerBtn.addEventListener("click", async () => {
   const username = authUsername.value.trim();
+
   const password = authPassword.value;
 
   if (!username || !password) {
     showAuthMessage("ENTER USERNAME AND PASSWORD");
+
     return;
   }
 
   registerBtn.disabled = true;
+
   loginBtn.disabled = true;
 
   showAuthMessage("CREATING ACCOUNT…");
@@ -152,20 +166,18 @@ registerBtn.addEventListener("click", async () => {
       throw new Error(data.error || "Registration failed");
     }
 
-    // Sign into Firebase
     await signInWithCustomToken(auth, data.token);
 
     currentUsername = data.username;
 
     authPanel.style.display = "none";
 
-    // Show username
-    userNameDisplay.innerText = currentUsername || "PLAYER";
+    userNameDisplay.innerText = currentUsername;
+
     userPanel.style.display = "flex";
 
     message.innerText = `Welcome, ${currentUsername}!`;
 
-    // Refresh leaderboard
     await renderLeaderboard();
   } catch (error) {
     console.error("Registration error:", error);
@@ -173,6 +185,7 @@ registerBtn.addEventListener("click", async () => {
     showAuthMessage(error.message || "ACCOUNT CREATION FAILED");
   } finally {
     registerBtn.disabled = false;
+
     loginBtn.disabled = false;
   }
 });
@@ -192,11 +205,10 @@ signOutBtn.addEventListener("click", async () => {
     authPanel.style.display = "flex";
 
     authUsername.value = "";
+
     authPassword.value = "";
 
     showAuthMessage("LOGGED OUT");
-
-    message.innerText = "Please login to play";
 
     resetGame();
   } catch (error) {
@@ -227,40 +239,38 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // =========================================================
-// LEADERBOARD SERVICE
-// =========================================================
-// NOTE:
-// This is still localStorage for now.
-// Next step will replace this with Firestore
-// so everyone can see the same Top 20 leaderboard.
+// GLOBAL FIRESTORE LEADERBOARD
 // =========================================================
 
 class LeaderboardService {
-  constructor(storageKey = "cyber_simon_top20", maxLimit = 20) {
-    this.storageKey = storageKey;
+  constructor(maxLimit = 20) {
     this.maxLimit = maxLimit;
   }
 
   // =======================================================
-  // GET TOP 20
+  // GET GLOBAL TOP 20
   // =======================================================
 
   async getTopScores() {
     try {
-      const data = localStorage.getItem(this.storageKey);
+      const response = await fetch("/api/leaderboard");
 
-      const scores = data ? JSON.parse(data) : [];
+      if (!response.ok) {
+        throw new Error("Unable to load scores");
+      }
+
+      const scores = await response.json();
 
       return scores.sort((a, b) => b.score - a.score).slice(0, this.maxLimit);
-    } catch (err) {
-      console.error("Error retrieving scores:", err);
+    } catch (error) {
+      console.error("Error retrieving scores:", error);
 
       return [];
     }
   }
 
   // =======================================================
-  // CHECK IF SCORE ENTERS TOP 20
+  // CHECK IF SCORE ENTERS GLOBAL TOP 20
   // =======================================================
 
   async isTopScore(score) {
@@ -278,36 +288,42 @@ class LeaderboardService {
   }
 
   // =======================================================
-  // SAVE SCORE
+  // SAVE SCORE TO FIRESTORE
   // =======================================================
 
-  async saveScore(name, score) {
+  async saveScore(score) {
     try {
-      const newEntry = {
-        id: "score_" + Date.now(),
+      if (!auth.currentUser) {
+        throw new Error("User is not logged in");
+      }
 
-        name: name.trim().slice(0, 12).toUpperCase() || "OPERATOR",
+      const idToken = await auth.currentUser.getIdToken();
 
-        score: parseInt(score, 10),
+      const response = await fetch("/api/leaderboard", {
+        method: "POST",
 
-        timestamp: Date.now(),
-      };
+        headers: {
+          "Content-Type": "application/json",
 
-      const currentScores = await this.getTopScores();
+          Authorization: `Bearer ${idToken}`,
+        },
 
-      currentScores.push(newEntry);
+        body: JSON.stringify({
+          score: score,
+        }),
+      });
 
-      currentScores.sort((a, b) => b.score - a.score);
+      const data = await response.json();
 
-      const trimmed = currentScores.slice(0, this.maxLimit);
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to save score");
+      }
 
-      localStorage.setItem(this.storageKey, JSON.stringify(trimmed));
+      return data;
+    } catch (error) {
+      console.error("Error saving score:", error);
 
-      return trimmed;
-    } catch (err) {
-      console.error("Error saving score:", err);
-
-      return [];
+      return null;
     }
   }
 }
@@ -319,6 +335,7 @@ const leaderboard = new LeaderboardService();
 // =========================================================
 
 let gameSeq = [];
+
 let userSeq = [];
 
 let level = 0;
@@ -363,10 +380,6 @@ const board = document.querySelector("#board");
 
 const particlesContainer = document.querySelector("#particles");
 
-// =========================================================
-// LEADERBOARD DOM
-// =========================================================
-
 const leaderboardList = document.querySelector("#leaderboardList");
 
 // =========================================================
@@ -383,7 +396,9 @@ function formatDate(timestamp) {
 }
 
 async function renderLeaderboard() {
-  leaderboardList.innerHTML = `<div class="lb-empty">FETCHING SCORES…</div>`;
+  leaderboardList.innerHTML = `<div class="lb-empty">
+      FETCHING GLOBAL SCORES…
+    </div>`;
 
   const scores = await leaderboard.getTopScores();
 
@@ -393,6 +408,7 @@ async function renderLeaderboard() {
       </div>`;
 
     highScore = 0;
+
     highScoreText.innerText = "0";
 
     return;
@@ -413,35 +429,37 @@ async function renderLeaderboard() {
       }
 
       return `
-          <div class="lb-row">
+            <div class="lb-row">
 
-            <span class="lb-rank ${rankCls}">
-              #${rank}
-            </span>
+              <span
+                class="lb-rank ${rankCls}"
+              >
+                #${rank}
+              </span>
 
-            <span
-              class="lb-name"
-              title="${item.name}"
-            >
-              ${item.name}
-            </span>
+              <span
+                class="lb-name"
+                title="${item.name}"
+              >
+                ${item.name}
+              </span>
 
-            <span class="lb-date">
-              ${item.timestamp ? formatDate(item.timestamp) : "--/--"}
-            </span>
+              <span class="lb-date">
+                ${item.timestamp ? formatDate(item.timestamp) : "--/--"}
+              </span>
 
-            <span class="lb-score">
-              ${item.score}
-            </span>
+              <span class="lb-score">
+                ${item.score}
+              </span>
 
-          </div>
-        `;
+            </div>
+          `;
     })
     .join("");
 
-  // Update HUD with #1 score
+  // Global #1 score
 
-  highScore = scores.length > 0 ? scores[0].score : 0;
+  highScore = scores[0].score;
 
   highScoreText.innerText = highScore;
 }
@@ -475,6 +493,7 @@ function playSound(freq, duration = 0.22) {
 
   gain.gain.exponentialRampToValueAtTime(
     0.001,
+
     audioContext.currentTime + duration,
   );
 
@@ -486,6 +505,10 @@ function playSound(freq, duration = 0.22) {
 
   osc.stop(audioContext.currentTime + duration);
 }
+
+// =========================================================
+// ERROR SOUND
+// =========================================================
 
 function playError() {
   playSound(110, 0.4);
@@ -532,7 +555,7 @@ function spawnParticles(x, y, color) {
 }
 
 // =========================================================
-// GAMEPLAY LOGIC
+// GAMEPLAY
 // =========================================================
 
 startBtn.addEventListener("click", startGame);
@@ -547,8 +570,6 @@ function startGame() {
   if (started) {
     return;
   }
-
-  // Don't allow playing without login
 
   if (!currentUsername) {
     message.innerText = "PLEASE LOGIN FIRST";
@@ -578,7 +599,7 @@ function startGame() {
 }
 
 // =========================================================
-// RESET GAME
+// RESET
 // =========================================================
 
 function resetGame() {
@@ -644,13 +665,13 @@ function levelUp() {
 
   levelText.classList.add("pulse");
 
-  setTimeout(
-    () => levelText.classList.remove("pulse"),
+  setTimeout(() => levelText.classList.remove("pulse"), 300);
 
-    300,
+  const baseDelay = Math.max(
+    280,
+
+    520 - Math.floor((level - 1) / 3) * 55,
   );
-
-  const baseDelay = Math.max(280, 520 - Math.floor((level - 1) / 3) * 55);
 
   const randomColor = btns[Math.floor(Math.random() * btns.length)];
 
@@ -715,11 +736,7 @@ function checkAnswer(idx) {
 
       highScoreText.classList.add("pulse");
 
-      setTimeout(
-        () => highScoreText.classList.remove("pulse"),
-
-        400,
-      );
+      setTimeout(() => highScoreText.classList.remove("pulse"), 400);
     }
 
     const rect = board.getBoundingClientRect();
@@ -810,18 +827,14 @@ async function gameOver() {
   document.body.style.background =
     "radial-gradient(circle at 50% 45%, #450a0a, #06080f 70%)";
 
-  setTimeout(
-    () => {
-      board.classList.remove("game-over");
+  setTimeout(() => {
+    board.classList.remove("game-over");
 
-      document.body.style.background = "";
-    },
-
-    700,
-  );
+    document.body.style.background = "";
+  }, 700);
 
   // =======================================================
-  // AUTOMATICALLY SAVE LOGGED-IN USER'S SCORE
+  // SAVE SCORE USING LOGGED-IN USERNAME
   // =======================================================
 
   if (!currentUsername) {
@@ -832,13 +845,13 @@ async function gameOver() {
     const qualifies = await leaderboard.isTopScore(finalRound);
 
     if (qualifies) {
-      await leaderboard.saveScore(currentUsername, finalRound);
+      await leaderboard.saveScore(finalRound);
 
       await renderLeaderboard();
 
       message.innerText = `Score saved — ${currentUsername}`;
     }
   } catch (error) {
-    console.error("Error saving score:", error);
+    console.error("Score save error:", error);
   }
 }

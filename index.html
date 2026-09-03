@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Cyber Simon — Memory Protocol</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="glow-bg"></div>
+    <div class="particles" id="particles"></div>
+
+    <div class="app-layout">
+      <!-- MAIN GAME PANEL -->
+      <main class="game-container">
+        <header class="game-header">
+          <div class="logo">
+            <span class="logo-ring"></span>
+            <h1>SIMON</h1>
+          </div>
+          <p class="subtitle">MEMORY TEST PROTOCOL</p>
+        </header>
+
+        <section class="hud">
+          <div class="hud-card">
+            <span class="hud-label">ROUND</span>
+            <strong id="level" class="hud-value">0</strong>
+          </div>
+          <div class="hud-card highlight">
+            <span class="hud-label">YOUR RECORD</span>
+            <strong id="highScore" class="hud-value" style="color: #38bdf8;">0</strong>
+          </div>
+        </section>
+
+        <div class="status-wrap">
+          <p id="message" class="message">Press PLAY to begin</p>
+        </div>
+
+        <div class="board-wrapper">
+          <div class="game-board" id="board">
+            <button class="btn red" id="red" aria-label="Red"></button>
+            <button class="btn green" id="green" aria-label="Green"></button>
+            <button class="btn yellow" id="yellow" aria-label="Yellow"></button>
+            <button class="btn blue" id="blue" aria-label="Blue"></button>
+
+            <div class="center-hub">
+              <div class="inner-hub">
+                <span class="hub-title">SIMON</span>
+                <span class="hub-sub">GAME</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="startBtn" class="control-btn start-btn">
+            <span>PLAY</span>
+          </button>
+          <button id="resetBtn" class="control-btn reset-btn">
+            <span>ABORT</span>
+          </button>
+        </div>
+
+        <footer class="game-footer">
+          <p>MEMORIZE • SYNCHRONIZE • EXECUTE</p>
+          <p class="tip">Tip: Speed increases every few rounds</p>
+        </footer>
+      </main>
+
+      <!-- ALWAYS VISIBLE LEADERBOARD PANEL -->
+      <aside class="leaderboard-panel">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <span class="panel-icon">🏆</span>
+            <h2>HALL OF FAME</h2>
+          </div>
+          <span class="live-tag">LIVE TOP 20</span>
+        </div>
+        <p class="panel-subtitle">GLOBAL TOP MEMORY SCORE REGISTRY</p>
+
+        <!-- Dynamic Inline Name Input for High Score Qualifier -->
+        <div class="qualifier-banner" id="qualifierBanner">
+          <div class="qualifier-info">
+            <span
+              >⚡ NEW RECORD: ROUND <strong id="qualifierScore">0</strong></span
+            >
+          </div>
+          <form id="scoreForm" class="inline-score-form">
+            <input
+              type="text"
+              id="playerNameInput"
+              maxlength="12"
+              placeholder="ENTER CALLSIGN"
+              autocomplete="off"
+              required
+            />
+            <button type="submit" class="submit-record-btn">SAVE</button>
+          </form>
+        </div>
+
+        <div class="leaderboard-table-header">
+          <span>RANK</span>
+          <span>PLAYERS</span>
+          <span>DATE</span>
+          <span class="text-right">ROUND</span>
+        </div>
+
+        <div class="leaderboard-scroll" id="leaderboardList">
+          <!-- Leaderboard Rows Inserted Here Dynamically -->
+        </div>
+      </aside>
+    </div>
+
+    <script type="module" src="script.js"></script>
+  </body>
+</html>

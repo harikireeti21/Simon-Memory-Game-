@@ -1,4 +1,6 @@
-const admin = require("firebase-admin");
+const { initializeApp, getApps, cert } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
+const { getAuth } = require("firebase-admin/auth");
 
 const projectId = process.env.FIREBASE_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
@@ -20,17 +22,18 @@ if (!privateKey.includes("BEGIN PRIVATE KEY")) {
   throw new Error("FIREBASE_PRIVATE_KEY is invalid");
 }
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId,
-      clientEmail,
-      privateKey: privateKey.replace(/\\n/g, "\n"),
-    }),
-  });
-}
+const firebaseApp =
+  getApps().length === 0
+    ? initializeApp({
+        credential: cert({
+          projectId,
+          clientEmail,
+          privateKey: privateKey.replace(/\\n/g, "\n"),
+        }),
+      })
+    : getApps()[0];
 
-const db = admin.firestore();
-const auth = admin.auth();
+const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
 
-module.exports = { admin, db, auth };
+module.exports = { db, auth };

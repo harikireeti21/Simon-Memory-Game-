@@ -6,12 +6,75 @@ const { auth, db } = require("./firebaseAdmin");
 
 module.exports = async (req, res) => {
   // =======================================================
-  // GET TOP 20
-  // Anyone can view the global leaderboard
+  // GET REQUEST
   // =======================================================
 
   if (req.method === "GET") {
     try {
+      // =================================================
+      // GET CURRENT USER'S PERSONAL BEST
+      // /api/leaderboard?mine=true
+      // =================================================
+
+      if (req.query && req.query.mine === "true") {
+        const authHeader = req.headers.authorization || "";
+
+        if (!authHeader.startsWith("Bearer ")) {
+          return res.status(401).json({
+            error: "Authentication required",
+          });
+        }
+
+        const idToken = authHeader.substring(7);
+
+        const decodedToken = await auth.verifyIdToken(idToken);
+
+        const uid = decodedToken.uid;
+
+        // ---------------------------------------------
+        // Get all scores belonging to this user
+        // ---------------------------------------------
+
+        const snapshot = await db
+          .collection("scores")
+          .where("uid", "==", uid)
+          .get();
+
+        // ---------------------------------------------
+        // No scores yet
+        // ---------------------------------------------
+
+        if (snapshot.empty) {
+          return res.status(200).json({
+            bestScore: 0,
+          });
+        }
+
+        // ---------------------------------------------
+        // Find user's highest score
+        // ---------------------------------------------
+
+        let bestScore = 0;
+
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data();
+
+          const score = Number(data.score);
+
+          if (Number.isInteger(score) && score > bestScore) {
+            bestScore = score;
+          }
+        });
+
+        return res.status(200).json({
+          bestScore: bestScore,
+        });
+      }
+
+      // =================================================
+      // GET GLOBAL TOP 20
+      // =================================================
+
       const snapshot = await db
         .collection("scores")
         .orderBy("score", "desc")
@@ -23,6 +86,10 @@ module.exports = async (req, res) => {
 
         let timestamp = Date.now();
 
+        // -------------------------------------
+        // Convert Firestore timestamp
+        // -------------------------------------
+
         if (data.createdAt) {
           if (typeof data.createdAt.toMillis === "function") {
             timestamp = data.createdAt.toMillis();
@@ -33,8 +100,11 @@ module.exports = async (req, res) => {
 
         return {
           id: doc.id,
+
           name: data.username || "OPERATOR",
-          score: data.score,
+
+          score: Number(data.score),
+
           timestamp: timestamp,
         };
       });
@@ -51,14 +121,13 @@ module.exports = async (req, res) => {
 
   // =======================================================
   // POST SCORE
-  // Only logged-in users can submit scores
   // =======================================================
 
   if (req.method === "POST") {
     try {
-      // -------------------------------------------------
-      // Get Firebase ID token
-      // -------------------------------------------------
+      // =================================================
+      // CHECK LOGIN TOKEN
+      // =================================================
 
       const authHeader = req.headers.authorization || "";
 
@@ -70,9 +139,9 @@ module.exports = async (req, res) => {
 
       const idToken = authHeader.substring(7);
 
-      // -------------------------------------------------
-      // Verify token
-      // -------------------------------------------------
+      // =================================================
+      // VERIFY FIREBASE USER
+      // =================================================
 
       const decodedToken = await auth.verifyIdToken(idToken);
 
@@ -80,9 +149,9 @@ module.exports = async (req, res) => {
 
       const username = decodedToken.username || decodedToken.name || "OPERATOR";
 
-      // -------------------------------------------------
-      // Get score
-      // -------------------------------------------------
+      // =================================================
+      // READ SCORE
+      // =================================================
 
       const score = Number(req.body.score);
 
@@ -92,9 +161,9 @@ module.exports = async (req, res) => {
         });
       }
 
-      // -------------------------------------------------
-      // Save score to Firestore
-      // -------------------------------------------------
+      // =================================================
+      // SAVE SCORE TO FIRESTORE
+      // =================================================
 
       const scoreRef = await db.collection("scores").add({
         uid: uid,
@@ -125,7 +194,7 @@ module.exports = async (req, res) => {
   }
 
   // =======================================================
-  // OTHER METHODS
+  // METHOD NOT ALLOWED
   // =======================================================
 
   return res.status(405).json({

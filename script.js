@@ -26,7 +26,7 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 
 // =========================================================
-// AUTHENTICATION
+// AUTHENTICATION ELEMENTS
 // =========================================================
 
 const authPanel = document.querySelector("#authPanel");
@@ -77,6 +77,7 @@ loginBtn.addEventListener("click", async () => {
   }
 
   loginBtn.disabled = true;
+
   registerBtn.disabled = true;
 
   showAuthMessage("AUTHENTICATING…");
@@ -90,8 +91,9 @@ loginBtn.addEventListener("click", async () => {
       },
 
       body: JSON.stringify({
-        username,
-        password,
+        username: username,
+
+        password: password,
       }),
     });
 
@@ -113,6 +115,10 @@ loginBtn.addEventListener("click", async () => {
 
     message.innerText = `Welcome, ${currentUsername}!`;
 
+    // Load this user's personal best
+    await loadPersonalBest();
+
+    // Load global leaderboard
     await renderLeaderboard();
   } catch (error) {
     console.error("Login error:", error);
@@ -155,8 +161,9 @@ registerBtn.addEventListener("click", async () => {
       },
 
       body: JSON.stringify({
-        username,
-        password,
+        username: username,
+
+        password: password,
       }),
     });
 
@@ -177,6 +184,9 @@ registerBtn.addEventListener("click", async () => {
     userPanel.style.display = "flex";
 
     message.innerText = `Welcome, ${currentUsername}!`;
+
+    // New user has no score yet
+    await loadPersonalBest();
 
     await renderLeaderboard();
   } catch (error) {
@@ -208,6 +218,10 @@ signOutBtn.addEventListener("click", async () => {
 
     authPassword.value = "";
 
+    highScore = 0;
+
+    highScoreText.innerText = "0";
+
     showAuthMessage("LOGGED OUT");
 
     resetGame();
@@ -220,7 +234,7 @@ signOutBtn.addEventListener("click", async () => {
 // CHECK LOGIN STATE
 // =========================================================
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUsername = user.displayName || currentUsername;
 
@@ -229,6 +243,12 @@ onAuthStateChanged(auth, (user) => {
     userNameDisplay.innerText = currentUsername || "PLAYER";
 
     userPanel.style.display = "flex";
+
+    // Load personal record
+    await loadPersonalBest();
+
+    // Load global leaderboard
+    await renderLeaderboard();
   } else {
     currentUsername = null;
 
@@ -239,7 +259,7 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // =========================================================
-// GLOBAL FIRESTORE LEADERBOARD
+// GLOBAL LEADERBOARD SERVICE
 // =========================================================
 
 class LeaderboardService {
@@ -256,7 +276,7 @@ class LeaderboardService {
       const response = await fetch("/api/leaderboard");
 
       if (!response.ok) {
-        throw new Error("Unable to load scores");
+        throw new Error("Unable to load leaderboard");
       }
 
       const scores = await response.json();
@@ -270,25 +290,7 @@ class LeaderboardService {
   }
 
   // =======================================================
-  // CHECK IF SCORE ENTERS GLOBAL TOP 20
-  // =======================================================
-
-  async isTopScore(score) {
-    if (score <= 0) {
-      return false;
-    }
-
-    const scores = await this.getTopScores();
-
-    if (scores.length < this.maxLimit) {
-      return true;
-    }
-
-    return score > scores[scores.length - 1].score;
-  }
-
-  // =======================================================
-  // SAVE SCORE TO FIRESTORE
+  // SAVE SCORE
   // =======================================================
 
   async saveScore(score) {
@@ -297,6 +299,7 @@ class LeaderboardService {
         throw new Error("User is not logged in");
       }
 
+      // Get current Firebase ID token
       const idToken = await auth.currentUser.getIdToken();
 
       const response = await fetch("/api/leaderboard", {
@@ -331,7 +334,7 @@ class LeaderboardService {
 const leaderboard = new LeaderboardService();
 
 // =========================================================
-// GAME ENGINE & STATE
+// GAME STATE
 // =========================================================
 
 let gameSeq = [];
@@ -343,6 +346,9 @@ let level = 0;
 let started = false;
 
 let isPlayingSequence = false;
+
+// IMPORTANT:
+// This is now the CURRENT USER'S personal best.
 
 let highScore = 0;
 
@@ -383,7 +389,53 @@ const particlesContainer = document.querySelector("#particles");
 const leaderboardList = document.querySelector("#leaderboardList");
 
 // =========================================================
-// LEADERBOARD RENDER
+// LOAD CURRENT USER'S PERSONAL BEST
+// =========================================================
+
+async function loadPersonalBest() {
+  // -----------------------------------------------
+  // No logged-in user
+  // -----------------------------------------------
+
+  if (!auth.currentUser) {
+    highScore = 0;
+
+    highScoreText.innerText = "0";
+
+    return;
+  }
+
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+
+    const response = await fetch("/api/leaderboard?mine=true", {
+      method: "GET",
+
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to load personal record");
+    }
+
+    // -----------------------------------------------
+    // THIS is the user's own best score
+    // -----------------------------------------------
+
+    highScore = Number(data.bestScore) || 0;
+
+    highScoreText.innerText = highScore;
+  } catch (error) {
+    console.error("Personal best error:", error);
+  }
+}
+
+// =========================================================
+// FORMAT DATE
 // =========================================================
 
 function formatDate(timestamp) {
@@ -394,6 +446,10 @@ function formatDate(timestamp) {
     .toString()
     .padStart(2, "0")}`;
 }
+
+// =========================================================
+// RENDER GLOBAL TOP 20
+// =========================================================
 
 async function renderLeaderboard() {
   leaderboardList.innerHTML = `<div class="lb-empty">
@@ -406,10 +462,6 @@ async function renderLeaderboard() {
     leaderboardList.innerHTML = `<div class="lb-empty">
         NO RECORDS YET — SET THE BAR!
       </div>`;
-
-    highScore = 0;
-
-    highScoreText.innerText = "0";
 
     return;
   }
@@ -444,11 +496,15 @@ async function renderLeaderboard() {
                 ${item.name}
               </span>
 
-              <span class="lb-date">
+              <span
+                class="lb-date"
+              >
                 ${item.timestamp ? formatDate(item.timestamp) : "--/--"}
               </span>
 
-              <span class="lb-score">
+              <span
+                class="lb-score"
+              >
                 ${item.score}
               </span>
 
@@ -456,12 +512,6 @@ async function renderLeaderboard() {
           `;
     })
     .join("");
-
-  // Global #1 score
-
-  highScore = scores[0].score;
-
-  highScoreText.innerText = highScore;
 }
 
 // =========================================================
@@ -513,7 +563,11 @@ function playSound(freq, duration = 0.22) {
 function playError() {
   playSound(110, 0.4);
 
-  setTimeout(() => playSound(90, 0.35), 120);
+  setTimeout(
+    () => playSound(90, 0.35),
+
+    120,
+  );
 }
 
 // =========================================================
@@ -571,6 +625,10 @@ function startGame() {
     return;
   }
 
+  // -----------------------------------------------
+  // Login required
+  // -----------------------------------------------
+
   if (!currentUsername) {
     message.innerText = "PLEASE LOGIN FIRST";
 
@@ -599,7 +657,7 @@ function startGame() {
 }
 
 // =========================================================
-// RESET
+// RESET GAME
 // =========================================================
 
 function resetGame() {
@@ -665,7 +723,11 @@ function levelUp() {
 
   levelText.classList.add("pulse");
 
-  setTimeout(() => levelText.classList.remove("pulse"), 300);
+  setTimeout(
+    () => levelText.classList.remove("pulse"),
+
+    300,
+  );
 
   const baseDelay = Math.max(
     280,
@@ -729,6 +791,10 @@ function checkAnswer(idx) {
     message.innerText =
       level % 5 === 0 ? `Round ${level}! Phenomenal!` : "Verified! Next…";
 
+    // -----------------------------------------------
+    // Update YOUR RECORD during the game
+    // -----------------------------------------------
+
     if (level > highScore) {
       highScore = level;
 
@@ -736,7 +802,11 @@ function checkAnswer(idx) {
 
       highScoreText.classList.add("pulse");
 
-      setTimeout(() => highScoreText.classList.remove("pulse"), 400);
+      setTimeout(
+        () => highScoreText.classList.remove("pulse"),
+
+        400,
+      );
     }
 
     const rect = board.getBoundingClientRect();
@@ -827,14 +897,18 @@ async function gameOver() {
   document.body.style.background =
     "radial-gradient(circle at 50% 45%, #450a0a, #06080f 70%)";
 
-  setTimeout(() => {
-    board.classList.remove("game-over");
+  setTimeout(
+    () => {
+      board.classList.remove("game-over");
 
-    document.body.style.background = "";
-  }, 700);
+      document.body.style.background = "";
+    },
+
+    700,
+  );
 
   // =======================================================
-  // SAVE SCORE USING LOGGED-IN USERNAME
+  // SAVE SCORE
   // =======================================================
 
   if (!currentUsername) {
@@ -842,10 +916,25 @@ async function gameOver() {
   }
 
   try {
-    const qualifies = await leaderboard.isTopScore(finalRound);
+    // -----------------------------------------------
+    // Save EVERY completed score.
+    //
+    // This is important because:
+    // A user's personal best might not be Top 20.
+    // -----------------------------------------------
 
-    if (qualifies) {
-      await leaderboard.saveScore(finalRound);
+    const result = await leaderboard.saveScore(finalRound);
+
+    if (result) {
+      // ---------------------------------------------
+      // Reload user's personal best
+      // ---------------------------------------------
+
+      await loadPersonalBest();
+
+      // ---------------------------------------------
+      // Reload global Top 20
+      // ---------------------------------------------
 
       await renderLeaderboard();
 
